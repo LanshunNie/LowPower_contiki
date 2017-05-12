@@ -24,7 +24,6 @@ enum
 
 #define CMD_SYSTEM_MONITOR      0x00  
 
-//#define INDEX_SCHEDULE  		    0 //18	    //   调度信息   18byte schedule 
 #define INDEX_TIME                  0//3       //   时间同步   3 byte time
 #define INDEX_TOPO  				3//2	    //   网络拓扑            2 byte    parent id
 #define INDEX_ENERGYCOST  		    5//24	    //   能耗              4*6 byte   record 200+years
@@ -35,18 +34,15 @@ enum
 #define INDEX_RTMETRIC				35//2
 
 #define INDEX_TIME_DIFF				37//1		//  时间差
-#define INDEX_RESTART_COUNT                                       38//1
+#define INDEX_RESTART_COUNT         38//1
 
-#define INDEX_PARENTRSSI            39 //2
-#define INDEX_IRQ                   41
-#define INDEX_NETSYN_SOURCEID                                       47//2
-#define INDEX_NETSYN_RECVTIME                                       49//3
-#define INDEX_NETSYN_RECVSEQNUM                                       52//1
-#define INDEX_NETSYN_RECVLEVEL                                      53//1
+#define INDEX_CYCLETIME 			39//2
+#define INDEX_CYCLETIME_DIRECTION   41//1
+#define INDEX_CURRENT_BUDGET        42//4
 
-#define INDEX_AUTOCAL_INTERVAL       54    //4
-#define INDEX_CAL_OFFSET             58    //2
-#define INDEX_END                    60
+#define INDEX_NODE_BEHAVIOUR        46//10 
+
+#define INDEX_END                   56
 
 #define SYSTEM_MONITOR_MSG_LENGTH (INDEX_END)
 
@@ -124,6 +120,9 @@ int MeterCommandBurn();
 /*reset or initialization instruction*/
 void NodeReboot(void *p);
 void NodeReset(void *p);
+
+//zhangwei set changed for load balance
+uint8_t getNetDataTaskPeriod(void);
 // void msg_handler(char *appdata,int appdata_length);
 
 // void system_monitor_msg_send(void  * p);

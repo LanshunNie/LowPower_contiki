@@ -11,9 +11,14 @@ endif
 
 APPS += udp-fragment
 
-APPS += netsynch task-schedule node-function wake
+#APPS += netsynch task-schedule node-function wake
+#zhangwei set changed for load balance
+APPS += netsynch task-schedule node-function rdc-efficiency wake low-latency
 
 all: $(CONTIKI_PROJECT)
 MODULES += core/net/ipv6/multicast
+#zhangwei set changed for load balance
+MODULES += core/net/mac/energy-efficiency  
+
 CONTIKI_WITH_IPV6 = 1
 include $(CONTIKI)/Makefile.include

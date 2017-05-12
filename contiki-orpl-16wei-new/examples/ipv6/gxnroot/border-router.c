@@ -54,9 +54,16 @@
 #include <string.h>
 #include <ctype.h>
 #include "net/ipv6/multicast/uip-mcast6.h"
-#define UIP_MCAST6_CONF_ENGINE UIP_MCAST6_ENGINE_SCF
+ 
+//#define UIP_MCAST6_CONF_ENGINE UIP_MCAST6_ENGINE_SCF
 #define DEBUG DEBUG_NONE
 #include "net/ip/uip-debug.h"
+
+#if LOW_LATENCY
+#include "low-latency.h"
+#include "low-latency-msg.h"
+#endif
+
 
 #define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
 
@@ -89,7 +96,7 @@ static uip_ipaddr_t prefix;
 static uint8_t prefix_set;
 /*--------------------------------------------------------*/
 static void  msg_handler(char *appdata,int appdata_length);
-
+static void root_handle_message(void*p);
 static struct ctimer ct;
 static struct ctimer ct1;
 
@@ -366,12 +373,17 @@ static void
 multicast_send(void * p)
 {
   if(buffered_data_length){
+    printf("root node multicast_send\n");
     multicast_send_flag = 1;
     uip_udp_packet_send(mcast_conn, buffer, buffered_data_length + 1);
-
     sent_to_pan();
     leds_toggle(LEDS_ALL);
+  
+    #if LOW_LATENCY
+       ctimer_set(&ct,CLOCK_SECOND*2,root_handle_message,NULL);
+    #endif
   }
+
 }
 
 static void
@@ -452,22 +464,41 @@ tcpip_handler_border(void)
        printf("send type:%x-%x\n",(uint8_t)(*(buffer+1)),(uint8_t)(*(buffer+2)) );
 
        // if(multicast_send_flag == 1)
-              {
+        
         if(get_idle_time() >=2* 60 +10){      
           multicast_send(NULL);
         }
+
+      #if LOW_LATENCY
+        
+        if(get_lowLatency_flag() ==1){
+          if(get_low_latency_active_time() < 8){
+            low_latency_msg_send_register(multicast_send);
+          }else{
+            multicast_send(NULL);
+          }
+        }else{
+          if(get_lowLatency_flag() == 0 && get_active_flag() == 0){
+            low_latency_msg_send_register(multicast_send);
+          }
+        }
+
+      #else
+
+         ctimer_set(&ct,CLOCK_SECOND*10,root_handle_message,NULL);
+      #endif
       // printf("ready send\n");
        // task_schedule_set(&root_task_ts,TEMP_TASK,TASK_READY,TASK_PERIOD_DEFAULT,multicast_send,NULL);
          // leds_toggle(LEDS_ALL);
            // multicast_send_flag = 0;
-       }
+    
        
         // if(CMD_SYSTEM_MONITOR_1==(uint8_t)buffer[2]){
 
         //         msg_handler(buffer+2,buffered_data_length-1);
         // }else{
 
-                ctimer_set(&ct,CLOCK_SECOND*10,root_handle_message,NULL);
+               
         // }
        
        // if(sent_to_pan_flag==1){

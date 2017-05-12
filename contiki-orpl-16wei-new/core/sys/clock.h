@@ -184,6 +184,8 @@ void set_autocal_info(int autocal_offest,uint32_t autocal_interval);
 uint16_t get_nowdays();
 
 void set_ledon_flag(uint8_t flag);
+//zhangwei set changed for load balance
+unsigned long real_time_clock_second(void);
 #endif
 
 #endif /* CLOCK_H_ */

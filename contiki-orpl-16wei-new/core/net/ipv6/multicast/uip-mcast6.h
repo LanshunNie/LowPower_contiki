@@ -162,6 +162,10 @@ struct uip_mcast6_driver {
 #define RPL_CONF_MULTICAST     0   
 
 #define UIP_MCAST6             scf_driver
+#elif UIP_MCAST6_ENGINE == UIP_MCAST6_ENGINE_FCF
+#define RPL_CONF_MULTICAST     0   
+
+#define UIP_MCAST6             fcf_driver
 
 #else
 #error "Multicast Enabled with an Unknown Engine."
