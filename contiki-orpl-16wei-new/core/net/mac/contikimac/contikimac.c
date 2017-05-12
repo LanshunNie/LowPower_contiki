@@ -54,6 +54,9 @@
 #include "clock.h"
 #include <string.h>
 
+#include "net/ipv6/multicast/uip-mcast6.h"
+#if (UIP_MCAST6_CONF_ENGINE != UIP_MCAST6_ENGINE_FCF)
+
 #if CONTIKI_TARGET_TRXEB1120
 #include "cc1120.h"
 #endif
@@ -70,6 +73,16 @@
 /* We add a jitter in the ContikiMAC wakeups to avoid having the same collisions repeatedly */
 #define WITH_CONTIKIMIAC_JITTER   0    //1
 #endif
+
+//zhangwei set changed for load balance
+#if WITH_ENERGY_EFFICIENCY
+#include "net/mac/energy-efficiency/energy-efficiency.h"
+#endif
+#if LOW_LATENCY
+#include "low-latency.h"
+#endif
+static uint8_t low_latency_flag=0;
+
 
 /* TX/RX cycles are synchronized with neighbor wake periods */
 #ifdef CONTIKIMAC_CONF_WITH_PHASE_OPTIMIZATION
@@ -197,7 +210,7 @@ static int we_are_receiving_burst = 0;
 #ifdef CONTIKIMAC_CONF_MAX_SILENCE_PERIODS
 #define MAX_SILENCE_PERIODS                CONTIKIMAC_CONF_MAX_SILENCE_PERIODS
 #else
-#define MAX_SILENCE_PERIODS                5
+#define MAX_SILENCE_PERIODS                3//5
 #endif
 
 /* MAX_NONACTIVITY_PERIODS is the maximum number of periods we allow
@@ -206,7 +219,7 @@ static int we_are_receiving_burst = 0;
 #ifdef CONTIKIMAC_CONF_MAX_NONACTIVITY_PERIODS
 #define MAX_NONACTIVITY_PERIODS            CONTIKIMAC_CONF_MAX_NONACTIVITY_PERIODS
 #else
-#define MAX_NONACTIVITY_PERIODS            10
+#define MAX_NONACTIVITY_PERIODS            7//10
 #endif
 
 
@@ -440,7 +453,12 @@ powercycle(struct rtimer *t, void *ptr)
 
     rdc_channel_check_interval_count ++;
     //get_init_flag()==0 ;
-  if(get_active_flag() || ( get_init_flag()==0 &&
+
+    #if LOW_LATENCY
+    low_latency_flag = get_lowLatency_flag();
+    #endif
+
+  if(low_latency_flag==1 || get_active_flag() || ( get_init_flag()==0 &&
      rdc_channel_check_interval_count >= rdc_channel_check_interval)){
     
    // printf("do cca \n");
@@ -758,11 +776,18 @@ send_packet(mac_callback_t mac_callback, void *mac_callback_ptr,
 #endif
 
 // inactive don't send packet ,just return mac_tx_ok ;
-#if TRXEB1120_CONF_LOWPOWER 
- if(get_active_flag()== 0 ||get_idle_time()<= 10)
-   return MAC_TX_OK;
-#endif
+#if TRXEB1120_CONF_LOWPOWER
+  
+  #if LOW_LATENCY
+    low_latency_flag = get_lowLatency_flag();
+  #endif
 
+ if((get_active_flag()== 0 || get_idle_time()<= 10) && low_latency_flag ==0){
+   printf("drop mac_tx_ok\n");
+   return MAC_TX_OK;
+ }
+#endif
+   // printf("goto send_packet\n");
   /* Exit if RDC and radio were explicitly turned off */
    if(!contikimac_is_on && !contikimac_keep_radio_on) {
     PRINTF("contikimac: radio is turned off\n");
@@ -786,6 +811,21 @@ send_packet(mac_callback_t mac_callback, void *mac_callback_ptr,
       return MAC_TX_COLLISION;
     }
   } else {
+
+    /*
+     *zhangwei set changed for load balance
+     *
+     *
+     */
+    uip_ipaddr_t unicast_ip;
+
+    uip_ip6addr(&unicast_ip, 0xaaaa, 0, 0, 0, 0, 0, 0, 0x0002);
+    #if WITH_ENERGY_EFFICIENCY
+      ENERGY_EFFICIENCY_ADJUST_BEHAVIOUR(unicast_ip);
+    #endif
+      // printf("-----------------------\n");
+
+
 #if NETSTACK_CONF_WITH_IPV6
     PRINTDEBUG("contikimac: send unicast to %02x%02x:%02x%02x:%02x%02x:%02x%02x\n",
                packetbuf_addr(PACKETBUF_ADDR_RECEIVER)->u8[0],
@@ -908,7 +948,7 @@ send_packet(mac_callback_t mac_callback, void *mac_callback_ptr,
   watchdog_periodic();
   t0 = RTIMER_NOW();
   for(strobes = 0, collisions = 0;
-      got_strobe_ack == 0 && collisions == 0 &&get_active_flag() &&
+      got_strobe_ack == 0 && collisions == 0 && (get_active_flag() || low_latency_flag) &&
       RTIMER_CLOCK_LT(RTIMER_NOW(), t0 + STROBE_TIME); strobes++) {
 
     watchdog_periodic();
@@ -1265,20 +1305,41 @@ set_rdc_channel_check_interval(){
   rdc_channel_check_interval = rdc_inactive_channel_check_interval * rdc_active_channel_check_rate;
 }
 /*--------------------------------------------------------------------------*/
-static void 
-set_cycletime(){
-  CYCLE_TIME = RTIMER_ARCH_SECOND / rdc_active_channel_check_rate;
+//static 
+// void 
+// set_cycletime(){
+//   CYCLE_TIME = RTIMER_ARCH_SECOND / rdc_active_channel_check_rate;
   
-  //printf("CYCLE_TIME :%lu\n",CYCLE_TIME);
-  STROBE_TIME = (CYCLE_TIME + 2 * CHECK_TIME);
-//  rtimer_set(&rt, RTIMER_NOW() + CYCLE_TIME, 1, powercycle_wrapper, NULL);
+//   //printf("CYCLE_TIME :%lu\n",CYCLE_TIME);
+//   STROBE_TIME = (CYCLE_TIME + 2 * CHECK_TIME);
+// //  rtimer_set(&rt, RTIMER_NOW() + CYCLE_TIME, 1, powercycle_wrapper, NULL);
+// }
+//zhangwei set changed for load balance
+void 
+set_cycletime(uint16_t cycle_time)
+{
+
+    CYCLE_TIME = cycle_time;
+   // printf("CYCLE_TIME2 :%lu\n",CYCLE_TIME);
+    #if ROOTNODE
+      STROBE_TIME =( RTIMER_ARCH_SECOND / rdc_active_channel_check_rate + 2 * CHECK_TIME);
+    #else
+      STROBE_TIME = (CYCLE_TIME + 2 * CHECK_TIME);
+    #endif
+  //  rtimer_set(&rt, RTIMER_NOW() + CYCLE_TIME, 1, powercycle_wrapper, NULL);
+}
+uint16_t get_cycle_time(void){
+  return CYCLE_TIME;
 }
 /*--------------------------------------------------------------------------*/
 void 
 set_rdc_active_channel_check_rate(uint8_t channel_check_rate){
   if(channel_check_rate!= 0 && channel_check_rate != 0xFF){
     rdc_active_channel_check_rate = channel_check_rate;
-    set_cycletime();
+      // set_cycletime();
+//zhangwei set changed for load balance
+  set_cycletime(RTIMER_ARCH_SECOND / NETSTACK_RDC_CHANNEL_CHECK_RATE);
+
     set_rdc_channel_check_interval();
   }
 }
@@ -1314,7 +1375,9 @@ init(void)
   radio_is_on = 0;
   PT_INIT(&pt);
 
-  set_cycletime();
+  // set_cycletime();
+//zhangwei set changed for load balance
+  set_cycletime(RTIMER_ARCH_SECOND / NETSTACK_RDC_CHANNEL_CHECK_RATE);
 
 #if !WAKEUP_NODE_DEV
   rtimer_set(&rt, RTIMER_NOW() + CYCLE_TIME, 1, powercycle_wrapper, NULL);
@@ -1356,7 +1419,12 @@ turn_off(int keep_radio_on)
 static unsigned short
 duty_cycle(void)
 {
-  return (1ul * CLOCK_SECOND * CYCLE_TIME) / RTIMER_ARCH_SECOND;
+  //zhangwei set changed for load balance
+  uint32_t  cycle_time= (RTIMER_ARCH_SECOND / NETSTACK_RDC_CHANNEL_CHECK_RATE);
+
+  return (1ul * CLOCK_SECOND * cycle_time) / RTIMER_ARCH_SECOND;
+
+  // return (1ul * CLOCK_SECOND * CYCLE_TIME) / RTIMER_ARCH_SECOND;
 }
 /*---------------------------------------------------------------------------*/
 const struct rdc_driver contikimac_driver = {
@@ -1376,3 +1444,5 @@ contikimac_debug_print(void)
   return 0;
 }
 /*---------------------------------------------------------------------------*/
+#endif
+

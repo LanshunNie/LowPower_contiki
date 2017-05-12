@@ -13,7 +13,7 @@
 #include "contikimac.h"
 
 #include "netsync-auto-calibrate.h"
-
+#include "net/ipv6/multicast/fcf.h"
 #define DEBUG 0
 #if DEBUG 
 #include <stdio.h>
@@ -22,6 +22,13 @@
 #define PRINTF(...)
 #endif
 
+//zhangwei set changed for load balance
+#if WITH_ENERGY_EFFICIENCY
+#include "net/mac/energy-efficiency/energy-efficiency.h"
+#include "rdc-efficiency.h"
+#endif
+static uint8_t netDataPeriod =1;
+static struct ctimer ct;
 // static uint64_t last_cpu      = 0;
 // static uint64_t last_lpm      = 0;
 // static uint64_t last_transmit = 0;
@@ -55,15 +62,13 @@ static void set_energy(int index,uint8_t array[],uint64_t val)
 void get_system_monitor_msg(uint8_t array[],int length)
 {
 
-   unsigned long cpu,lpm,transmit,listen,irq;
+   uint64_t cpu,lpm,transmit,listen;
    uint16_t rtmetric;
    uint16_t beacon_interval;
    uint16_t num_neighbors;
    uint16_t temp_votlage=0;
    rpl_parent_t *preferred_parent;
    rpl_dag_t *dag;
-
-  struct netsynch_msg recvmsg ;
 
    soft_time timenow;
 
@@ -73,45 +78,49 @@ void get_system_monitor_msg(uint8_t array[],int length)
     return;
   }
    get_timenow(&timenow);
-   get_recvmsg(&recvmsg);
 
    array[INDEX_TIME]  =   timenow.hour;
    array[INDEX_TIME+1]=   timenow.minute;
    array[INDEX_TIME+2]=   timenow.sec;
 
+//zhangwei set changed for load balance
+   array[INDEX_CYCLETIME]  = (get_cycle_time()>>8) & 0xff;         
+   array[INDEX_CYCLETIME+1]=  get_cycle_time()&0xff;
+#if WITH_ENERGY_EFFICIENCY
+   uint8_t j=0;
+   array[INDEX_CYCLETIME_DIRECTION]= ENERGY_EFFICIENCY_GET(cycle_time_direction);
 
-   array[INDEX_NETSYN_SOURCEID]  =(recvmsg.nodeID>>8) & 0xff; 
-   array[INDEX_NETSYN_SOURCEID+1]  =recvmsg.nodeID& 0xff; 
+   array[INDEX_CURRENT_BUDGET] = (ENERGY_EFFICIENCY_GET(current_budget)>>24) & 0xff;
+   array[INDEX_CURRENT_BUDGET+1] = (ENERGY_EFFICIENCY_GET(current_budget)>>16) & 0xff;
+   array[INDEX_CURRENT_BUDGET+2] = (ENERGY_EFFICIENCY_GET(current_budget)>>8) & 0xff;
+   array[INDEX_CURRENT_BUDGET+3] = (ENERGY_EFFICIENCY_GET(current_budget)) & 0xff;
 
-   array[INDEX_NETSYN_RECVTIME]=   recvmsg.caltime.hour;
-   array[INDEX_NETSYN_RECVTIME+1]=   recvmsg.caltime.minute;
-   array[INDEX_NETSYN_RECVTIME+2]=   recvmsg.caltime.sec;
-   array[INDEX_NETSYN_RECVSEQNUM]  =recvmsg.seqnum;
-   array[INDEX_NETSYN_RECVLEVEL]  =recvmsg.authority_level;
+   for(j=0;j<10;j++){
+    array[INDEX_NODE_BEHAVIOUR+j] = ENERGY_EFFICIENCY_GET(behaviour_bit_map)[j];
+   }
 
+
+#endif
 
   energest_flush();
   cpu      = energest_type_time(ENERGEST_TYPE_CPU)      ;
   lpm      = energest_type_time(ENERGEST_TYPE_LPM)      ;
   transmit = energest_type_time(ENERGEST_TYPE_TRANSMIT) ;
   listen   = energest_type_time(ENERGEST_TYPE_LISTEN)   ;
-  irq     = energest_type_time(ENERGEST_TYPE_IRQ);
 
   PRINTF("cpu  %lu  , lpm  %lu , transmit %lu , listen %lu  \n", cpu,lpm,transmit,listen );
 
-  energest_type_set(ENERGEST_TYPE_CPU,0);
-  energest_type_set(ENERGEST_TYPE_LPM,0);
-  energest_type_set(ENERGEST_TYPE_TRANSMIT,0);
-  energest_type_set(ENERGEST_TYPE_LISTEN,0);
-  energest_type_set(ENERGEST_TYPE_IRQ,0);
+  // energest_type_set(ENERGEST_TYPE_CPU,0);
+  // energest_type_set(ENERGEST_TYPE_LPM,0);
+  // energest_type_set(ENERGEST_TYPE_TRANSMIT,0);
+  // energest_type_set(ENERGEST_TYPE_LISTEN,0);
+  // energest_type_set(ENERGEST_TYPE_IRQ,0);
 
   set_energy(INDEX_ENERGYCOST    , array , cpu         )      ;
   set_energy(INDEX_ENERGYCOST+6  , array , lpm         )      ;
   set_energy(INDEX_ENERGYCOST+12 , array , transmit)      ;
   set_energy(INDEX_ENERGYCOST+18 , array , listen   )      ;
   
-  set_energy(INDEX_IRQ  , array , irq )      ;
-
 // last_cpu         = cpu     ;
 // last_lpm         = lpm     ;
 // last_transmit    =transmit;
@@ -145,16 +154,14 @@ void get_system_monitor_msg(uint8_t array[],int length)
     num_neighbors   = 0;
   }      
 
-  array[INDEX_PARENTRSSI]       = 0; 
-  array[INDEX_PARENTRSSI+1]     = 0;;
-
   temp_votlage=get_voltage();
   array[INDEX_ADCVOLTAGE]       = (temp_votlage>>8)&0xff; 
   array[INDEX_ADCVOLTAGE+1]     = temp_votlage&0xff;
 
   array[INDEX_BEACON_INTERVAL]  = (beacon_interval>>8) & 0xff;         
   array[INDEX_BEACON_INTERVAL+1]=  beacon_interval&0xff;
-  
+  // num_neighbors = 0;
+  num_neighbors = get_receive_count();
   array[INDEX_NUM_NEIGHBORS]    = (num_neighbors>>8) & 0xff;         
   array[INDEX_NUM_NEIGHBORS+1]  = num_neighbors&0xff;
 
@@ -164,11 +171,6 @@ void get_system_monitor_msg(uint8_t array[],int length)
   array[INDEX_TIME_DIFF]        = netsynch_get_offset();
 
   array[INDEX_RESTART_COUNT] = restart_count;
-
-  struct netsync_cal_s *cal_info = get_autocal_info();
-
-  memcpy(array+INDEX_AUTOCAL_INTERVAL,&(cal_info->autocal_interval) ,4);
-  memcpy(array+INDEX_CAL_OFFSET, &(cal_info->cal_offest) ,2);
 
         #if DEBUG   
 
@@ -313,9 +315,17 @@ void setting_network_configuration1(uint8_t array[],int length,struct task_sched
       PRINTF("node_function.c array error conf1 \n");
       return;
    }
+//zhangwei set changed for load balance
+   netDataPeriod = array[0];
+
  task_schedule_set_period(ts,array[0]);
 
 }
+
+uint8_t getNetDataTaskPeriod(void){
+  return netDataPeriod;
+}
+
 // setting  schedule;
 void setting_network_configuration2(uint8_t array[],int length)
 { 
@@ -324,8 +334,8 @@ void setting_network_configuration2(uint8_t array[],int length)
        PRINTF("node_function.c array error conf2 \n");
        return ;
     }
-  
-   update_schedule(array);
+  ctimer_set(&ct,CLOCK_SECOND*4,update_schedule,array);
+   // update_schedule(array);
 }
 
 // /*Main Function instruction*/

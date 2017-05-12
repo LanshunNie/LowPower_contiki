@@ -66,7 +66,11 @@
   #if ROOTNODE
     #include "correct_time.h"
   #endif
- 
+
+   #if ROOT_WITH_ENERGY_EFFICIENCY
+    #include "rdc_control.h"
+  #endif
+
 #endif
 #include "node-id.h"
 
@@ -74,6 +78,13 @@
 #include "net/ipv6/uip-ds6.h"
 #endif /* NETSTACK_CONF_WITH_IPV6 */
 
+//zhangwei set changed for load balance
+#if  WITH_ENERGY_EFFICIENCY
+#include "rdc-efficiency.h"
+#endif
+#if LOW_LATENCY
+#include "low-latency.h"
+#endif
 
 #define DEBUG 0
 #include "net/ip/uip-debug.h"
@@ -182,10 +193,10 @@ main(int argc, char **argv)
   node_id_restore(); /* also configures node_mac[] */
 
 
-  // normalbyte_rfchannel_burn(ABNORMAL,0);
-  // restart_count_byte_burn(0);
-  // uint8_t arr[]={0x05,0x10,0x5B,0xFE,0x59,0x16};
-  // cmd_bytes_burn(arr);
+   normalbyte_rfchannel_burn(1,7);
+   //restart_count_byte_burn(0);
+   uint8_t arr[]={0x05,0x10,0x5B,0xFE,0x59,0x16};
+   cmd_bytes_burn(arr);
 
   normalbyte_rfchannel_restore();
    
@@ -328,12 +339,24 @@ main(int argc, char **argv)
  #if  ROOTNODE  
   // netsynch_set_authority_level(0); 
  correct_time_init();
+ 
+ //zhangwei set changed for load balance  
+ #if ROOT_WITH_ENERGY_EFFICIENCY
+ rdc_control_init();
+ #endif
+
  #endif	
 
 task_schedule_init();
 
 #endif
-  
+ 
+//zhangwei set changed for load balance  
+#if  WITH_ENERGY_EFFICIENCY
+ rdc_efficiency_init();
+#endif
+
+
   NETSTACK_RADIO.off();
 
   /*  process_start(&sensors_process, NULL);
@@ -368,6 +391,12 @@ task_schedule_init();
    */
   while(1) {
     int r;
+    uint8_t low_latency_flag = 0;
+
+    #if LOW_LATENCY
+    low_latency_flag = get_lowLatency_flag();
+    #endif
+
     do {
       /* Reset watchdog. */
       watchdog_periodic();
@@ -380,7 +409,7 @@ task_schedule_init();
      */
     int s = splhigh();          /* Disable interrupts. */
     /* uart1_active is for avoiding LPM3 when still sending or receiving */
-    if((process_nevents() != 0 || uart_active())&& get_active_flag() ){//&& get_active_flag()
+    if((process_nevents() != 0 || uart_active())&& (get_active_flag() || low_latency_flag) ){//&& get_active_flag()
       splx(s);                  /* Re-enable interrupts. */
     } else {
       // static unsigned long irq_energest = 0;

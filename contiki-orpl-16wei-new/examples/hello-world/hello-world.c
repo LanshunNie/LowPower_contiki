@@ -47,25 +47,43 @@
 PROCESS(hello_world_process, "Hello world process");
 AUTOSTART_PROCESSES(&hello_world_process);
 
+static struct ctimer ct;
+static uint8_t hello_cmd[5];
+static uint8_t schedule_bitmap[5];
+
+static void Hello(void *p){
+    uint8_t i;
+    
+    uint8_t *cmd = (uint8_t *)(p);
+
+     // uint8_t bitmap[] = (uint8_t *)(p);
+  // int i=0;
+     memcpy(schedule_bitmap,cmd, sizeof(schedule_bitmap) );
+    
+    printf("Hello----------\n");
+
+    for(i=0;i< schedule_bitmap[0];i++)
+    {
+        printf("%u  ",schedule_bitmap[i] );
+    }
+     printf("Hello----------\n");
+
+     ctimer_set(&ct,CLOCK_SECOND*2,Hello,hello_cmd);
+}
+
+
+
 PROCESS_THREAD(hello_world_process, ev, data)
 {
 
   PROCESS_BEGIN();
-  printf(" %x\n",get_voltage());
-  static struct etimer et;
-  etimer_set(&et,CLOCK_SECOND*2);
-  while(1)
-  {
-    
-     PROCESS_YIELD();
-     if(etimer_expired(&et)&& ev==PROCESS_EVENT_TIMER)
-     {
-      printf("dianya: \n");
-      printf(" %x\n",get_voltage());
-      etimer_set(&et,CLOCK_SECOND*3);
-     }
-
+  int i=0;
+ 
+  hello_cmd[0]=5;
+  for(i=1;i<hello_cmd[0];i++){
+    hello_cmd[i]=i*3;
   }
+  ctimer_set(&ct,CLOCK_SECOND*10,Hello,hello_cmd);
  
  PROCESS_END();
 

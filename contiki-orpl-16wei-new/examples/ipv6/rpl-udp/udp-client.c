@@ -41,7 +41,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "dev/leds.h"
-
+#include "low-latency-msg.h"
 #define UDP_CLIENT_PORT 8765
 #define UDP_SERVER_PORT 5678
 
@@ -228,8 +228,9 @@ PROCESS_THREAD(udp_client_process, ev, data)
 if(ev == PROCESS_EVENT_TIMER) {
 
     if(data==&periodic) {
-      etimer_reset(&periodic);
-      ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);          
+    //  etimer_reset(&periodic);
+    //  ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);   
+    low_latency_msg_send_register(send_packet);       
 #if WITH_COMPOWER
       if (print == 0) {
   powertrace_print("#P");

@@ -182,14 +182,14 @@ void cc1120_channel_set(uint8_t c);
 /*------------------------------------------------*/
 /*-------------uart  configure -------------------*/
 #undef  ROOTNODE
-#define ROOTNODE  0
+#define ROOTNODE  1
 
 #ifndef HW_NEW_BIG
 #define HW_NEW_BIG 0
 #endif 
 
 #ifndef HW_CONF_WITH_UART1
-#define HW_CONF_WITH_UART1 1
+#define HW_CONF_WITH_UART1 0
 #endif
 
 #if HW_CONF_WITH_UART1
@@ -198,13 +198,19 @@ void cc1120_channel_set(uint8_t c);
 #define uart_active()  uart0_active()
 #endif
 
+#undef LOW_LATENCY
+#define LOW_LATENCY 1
+
 // default baud rate 9600
 #if ROOTNODE
-#define XT2_115200  1     // baud rate 115200
-#define USE_4M_CRYSTAL 0  //0
+	#define XT2_115200     1     // baud rate 115200
+	#define USE_4M_CRYSTAL 0  //0
+	#define ROOT_WITH_ENERGY_EFFICIENCY 1
+#else
+	#define WITH_ENERGY_EFFICIENCY 1
 #endif
 
-#define HEAT_METER 1 // baud rate 2400
+#define HEAT_METER 0 // baud rate 2400
 /*------------------------------------------------*/
 #endif /* __PLATFORM_CONF_H__ */
 

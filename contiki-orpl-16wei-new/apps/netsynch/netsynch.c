@@ -188,7 +188,10 @@ void update_new_schedule(void*p){
 
 }
 
-void update_schedule(uint8_t bitmap[]){
+// void update_schedule(uint8_t bitmap[]){
+void update_schedule(void *p){
+
+  uint8_t *bitmap = (uint8_t *)(p);
   // int i=0;
   memcpy(schedule_bitmap,bitmap, sizeof(schedule_bitmap) );
 
@@ -549,7 +552,7 @@ init_schedule(void){
     for(i=0;i< sizeof(schedule_bitmap);i++){
         schedule_bitmap[i]=0xFF;
     }
-
+  // schedule_bitmap[0]=0x80;
 #if 0
     PRINTF(" sche_map :\n");     /*   */
     for (i = 0; i < 18; ++i){     

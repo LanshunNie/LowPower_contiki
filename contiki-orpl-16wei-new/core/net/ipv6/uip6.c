@@ -88,6 +88,11 @@
 
 #include <string.h>
 
+
+//zhangwei set changed for load balance
+#if WITH_ENERGY_EFFICIENCY
+#include "net/mac/energy-efficiency/energy-efficiency.h" 
+#endif
 /*---------------------------------------------------------------------------*/
 /* For Debug, logging, statistics                                            */
 /*---------------------------------------------------------------------------*/
@@ -1199,7 +1204,10 @@ uip_process(uint8_t flag)
         goto send;
     }
   }
-
+  //zhangwei set changed for load balance
+#if WITH_ENERGY_EFFICIENCY
+  ENERGY_EFFICIENCY_ADJUST_BEHAVIOUR(UIP_IP_BUF->destipaddr);
+#endif
   /*
    * Process Packets with a routable multicast destination:
    * - We invoke the multicast engine and let it do its thing

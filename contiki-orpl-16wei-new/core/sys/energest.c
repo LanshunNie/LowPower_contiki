@@ -66,7 +66,7 @@ energest_init(void)
 #endif
 }
 /*---------------------------------------------------------------------------*/
-unsigned long
+uint64_t
 energest_type_time(int type)
 {
   /* Note: does not support ENERGEST_CONF_LEVELDEVICE_LEVELS! */
@@ -81,7 +81,7 @@ energest_type_time(int type)
   return energest_total_time[type].current;
 }
 /*---------------------------------------------------------------------------*/
-unsigned long
+uint64_t
 energest_leveldevice_leveltime(int powerlevel)
 {
 #ifdef ENERGEST_CONF_LEVELDEVICE_LEVELS
@@ -92,7 +92,7 @@ energest_leveldevice_leveltime(int powerlevel)
 }
 /*---------------------------------------------------------------------------*/
 void
-energest_type_set(int type, unsigned long val)
+energest_type_set(int type, uint64_t val)
 {
   energest_total_time[type].current = val;
 }
@@ -107,15 +107,15 @@ energest_flush(void)
     if(energest_current_mode[i]) {
       now = RTIMER_NOW();
       energest_total_time[i].current += (rtimer_clock_t)
-	(now - energest_current_time[i]);
+  (now - energest_current_time[i]);
       energest_current_time[i] = now;
     }
   }
 }
 /*---------------------------------------------------------------------------*/
 #else /* ENERGEST_CONF_ON */
-void energest_type_set(int type, unsigned long val) {}
+void energest_type_set(int type, uint64_t val) {}
 void energest_init(void) {}
-unsigned long energest_type_time(int type) { return 0; }
+uint64_t energest_type_time(int type) { return 0; }
 void energest_flush(void) {}
 #endif /* ENERGEST_CONF_ON */
