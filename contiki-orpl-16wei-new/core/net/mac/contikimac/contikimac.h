@@ -51,5 +51,9 @@ void set_rdc_inactive_channel_check_interval(uint8_t inactive_channel_check_inte
 uint8_t get_rdc_active_channel_check_rate();
 uint8_t get_rdc_inactive_channel_check_interval();
 
+//zhangwei set changed for load balance
+void set_cycletime(uint16_t cycle_time);
+uint16_t get_cycle_time(void);
+
 void rdc_turn_radio_off(void);
 #endif /* CONTIKIMAC_H */

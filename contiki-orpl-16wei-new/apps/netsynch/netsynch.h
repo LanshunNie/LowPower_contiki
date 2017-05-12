@@ -99,7 +99,9 @@ void schedule_bitmap_set_new(uint8_t bitmap[]);
 
 void update_new_schedule(void*p);
 
-void update_schedule(uint8_t bitmap[]);
+// void update_schedule(uint8_t bitmap[]);
+void update_schedule(void *p);
+
 
 void schedule_bitmap_get(uint8_t *bitmap);
 
@@ -112,6 +114,7 @@ int netsynch_is_synched(void);
 uint8_t get_lastseqnum(void);
 
 void set_recvmsg(struct netsynch_msg msg);
+
 void get_recvmsg(struct netsynch_msg *msg);
 
 #if 1

@@ -39,9 +39,13 @@ ifeq ($(PREFIX),)
  PREFIX = aaaa::1/64
 endif
 MODULES += core/net/ipv6/multicast
+
+#zhangwei set changed for load balance
+APPS += netsynch task-schedule correct-time node-function rdc-control wake low-latency low-latency-msg
+
 CONTIKI_WITH_IPV6 = 1
 
-APPS += netsynch task-schedule correct-time node-function wake
+#APPS += netsynch task-schedule correct-time node-function wake
 
 APPS += udp-fragment
 

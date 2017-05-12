@@ -1028,8 +1028,9 @@ on(void)
   }
   radio_on_or_off = ON;
 
-  flushrx();
   ENERGEST_ON(ENERGEST_TYPE_LISTEN);
+  flushrx();
+  
   strobe(CC1120_SRX);
   RELEASE_SPI();
   BUSYWAIT_UNTIL((state() == CC1120_STATE_RX), RTIMER_SECOND / 100);

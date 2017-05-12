@@ -51,6 +51,7 @@
 #define UIP_MCAST6_ENGINE_SMRF        1 /**< The SMRF engine */
 #define UIP_MCAST6_ENGINE_ROLL_TM     2 /**< The ROLL TM engine */
 #define UIP_MCAST6_ENGINE_SCF         3  // simple controlled flooding 
+#define UIP_MCAST6_ENGINE_FCF         4  // fast controlled flooding 
 
 #endif /* UIP_MCAST6_ENGINES_H_ */
 /** @} */

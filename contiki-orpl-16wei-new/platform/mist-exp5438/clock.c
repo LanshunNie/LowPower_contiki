@@ -47,6 +47,15 @@
 #include "netsynch.h"
 #include "task-schedule.h"
 #endif
+//zhangwei set changed for load balance
+#if  WITH_ENERGY_EFFICIENCY
+#include "rdc-efficiency.h"
+#endif
+
+#if LOW_LATENCY
+#include "low-latency.h"
+#endif
+static uint8_t low_latency_flag=0;
 
 #define INTERVAL (RTIMER_ARCH_SECOND / CLOCK_SECOND)
 
@@ -84,6 +93,9 @@ static void update_soft_time();
 #endif
 /* last_tar is used for calculating clock_fine */
 static volatile uint16_t last_tar = 0;
+
+//zhangwei set changed for load balance
+static volatile unsigned long rtc_second;
 /*---------------------------------------------------------------------------*/
 static inline uint16_t
 read_tar(void)
@@ -378,23 +390,44 @@ ISR(RTC,rtcisr)
        active_flag_one_second_before=active_flag;
        set_active_flag(timenow.hour,timenow.minute,timenow.sec);
 
+       #if LOW_LATENCY
+       low_latency_flag= set_lowLatency_flag(timenow);
+       #endif
+
       if(active_flag!=active_flag_one_second_before){
          // set_cycletime(active_flag);
          if(active_flag ==1){
            // P3OUT &= ~0x40; 
            task_schedule_change();
+
+           //zhangwei set changed for load balance
+           rtc_second = 0;  //zhangwei set changed for energy efficiency
+
+           #if  WITH_ENERGY_EFFICIENCY
+
+             process_post(PROCESS_BROADCAST, energy_efficient_begin_event, NULL);
+
+           #endif
          }
       }   
 #endif
 // if node is root node keep working in active state forever.
   
 #if  (!ROOTNODE) & (!WAKEUP_NODE_DEV)
-    if(active_flag ==1){    
-   //  P3OUT &= ~0x40; // led on
+    if(active_flag ==1 || low_latency_flag == 1){    
+    // P3OUT &= ~0x40; // led on
       TA1CCTL1 |= CCIE;
+
+      //zhangwei set changed for load balance
+     if(low_latency_flag == 0){
+        #if  WITH_ENERGY_EFFICIENCY
+          rdc_efficiency_request_poll();
+        #endif
+        ++rtc_second;
+      } 
      // TA1CCTL0 |= CCIE;
     }else {         
-   //  P3OUT |=0x40;            //led   off
+    // P3OUT |=0x40;            //led   off
      TA1CCTL1 &= ~(CCIE);     //etimer  off
      
      // TA1CCTL0 &= ~(CCIE);     // rtimer off
@@ -505,6 +538,7 @@ clock_time_t get_idle_time(void)  //return 0 means not in active mode .
     // printf("%d %d\n",counter,index);
     return ((10*counter+9-timenow.minute%10)*60+(60-timenow.sec)); 
   }
+
   return 0x0;
 }
 
@@ -592,6 +626,17 @@ void write_calendar(calendar_time caltime)
 }
 #endif /*TRXEB1120_CONF_LOWPOWER */ 
 
+//zhangwei set changed for load balance
+unsigned long 
+real_time_clock_second(void)
+{
+  unsigned long t1, t2;
+  do {
+    t1 = rtc_second;
+    t2 = rtc_second;
+  } while(t1 != t2);
+  return t1;
+}
 #if 0
 int
 cpu_status(void)
